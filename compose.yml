@@ -1,0 +1,61 @@
+services:
+  postgresdb:
+    image: postgres
+    hostname: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=$POSTGRES_DB
+      - POSTGRES_USER=$POSTGRES_USER
+      - POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+    ports: 
+      - $POSTGRESQL_HOST_PORT:$POSTGRESQL_DOCKER_PORT
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+    depends_on:
+      - postgresdb
+  backend:
+    build: ./backend
+    env_file:
+      - .env
+    develop:
+      watch:
+        - action: sync
+          path: ./backend/src
+          target: /usr/local/app/backend/src
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./backend/package.json
+    links:
+      - postgresdb
+    ports:
+      - 3000:3000
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+        restart: true
+  # client:
+  #   build:
+  #     context: ./client
+  #     target: prod
+  #   ports:
+  #     - 80:80
+  #   depends_on:
+  #     - backend
+
+volumes:
+  postgres-data:
+
